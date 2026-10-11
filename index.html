@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoDispose | Smart EV Battery Disposal & Recycling Ecosystem</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Demo Walkthrough Banner -->
+  <aside class="demo-banner" id="demo-banner" aria-label="Demo Walkthrough Guide">
+    <div class="demo-banner-content">
+      <div class="demo-badge">
+        <span class="pulse-dot"></span>
+        <strong>LIVE DEMO WALKTHROUGH (Team CodeXtra)</strong>
+      </div>
+      <div class="demo-steps-track">
+        <button class="demo-step-btn active" data-step="1" onclick="runDemoStep(1)">1. Inspect Hazardous EB-103</button>
+        <button class="demo-step-btn" data-step="2" onclick="runDemoStep(2)">2. Request Quote for EB-101</button>
+        <button class="demo-step-btn" data-step="3" onclick="runDemoStep(3)">3. Vendor View: Send Quote</button>
+        <button class="demo-step-btn" data-step="4" onclick="runDemoStep(4)">4. Owner View: Accept Quote</button>
+        <button class="demo-step-btn" data-step="5" onclick="runDemoStep(5)">5. Advance Lifecycle (CO₂ Meter)</button>
+        <button class="demo-step-btn" data-step="6" onclick="runDemoStep(6)">6. Recycler Manifest View</button>
+      </div>
+      <button class="demo-close-btn" onclick="toggleDemoBanner(false)" title="Hide Walkthrough Banner">✕</button>
+    </div>
+  </aside>
+
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-logo" onclick="switchRole('owner')">
+        <div class="logo-icon-wrap">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="16" height="12" rx="2"></rect>
+            <path d="M22 11v4"></path>
+            <path d="M7 13l2-3 2 3-2 3-2-3z" fill="currentColor"></path>
+          </svg>
+          <span class="leaf-badge">🌱</span>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">EcoDispose <span class="tag-version">v2.0</span></div>
+          <div class="brand-sub">Smart EV Battery Lifecycle & Circular Network</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Role Switcher Tabs -->
+    <nav class="role-nav" aria-label="Role Switcher">
+      <button class="role-btn active" id="role-owner-btn" onclick="switchRole('owner')">
+        <span class="role-icon">🚗</span>
+        <span class="role-label">Battery Owner</span>
+      </button>
+      <button class="role-btn" id="role-vendor-btn" onclick="switchRole('vendor')">
+        <span class="role-icon">🔧</span>
+        <span class="role-label">Vendor Portal</span>
+        <span class="role-counter" id="vendor-request-count">1</span>
+      </button>
+      <button class="role-btn" id="role-recycler-btn" onclick="switchRole('recycler')">
+        <span class="role-icon">♻️</span>
+        <span class="role-label">Certified Recycler</span>
+        <span class="role-counter danger" id="recycler-hazard-count">1</span>
+      </button>
+    </nav>
+
+    <!-- Top Right Actions -->
+    <div class="header-right">
+      <button class="icon-btn" id="alerts-toggle-btn" onclick="toggleAlertsDrawer()" title="View Alerts & Hazard Notifications">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span class="badge-dot" id="unread-alert-dot"></span>
+      </button>
+
+      <button class="icon-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode">
+        <span id="theme-icon">🌙</span>
+      </button>
+
+      <button class="btn btn-secondary btn-sm" onclick="resetToSeedData()" title="Reset to Sample Demo Data">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"></path>
+        </svg>
+        Reset Data
+      </button>
+
+      <button class="btn btn-primary btn-sm" onclick="openRegisterModal()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14"></path>
+        </svg>
+        Register Battery
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+    
+    <!-- OWNER VIEW -->
+    <section id="owner-view" class="view-panel active">
+      
+      <!-- Summary Metrics Band -->
+      <div class="summary-band">
+        <div class="stat-card" data-card="total">
+          <div class="stat-header">
+            <span class="stat-title">Total Monitored Packs</span>
+            <span class="stat-icon">🔋</span>
+          </div>
+          <div class="stat-value" id="stat-total-batteries">4</div>
+          <div class="stat-meta">Traceable across all tiers</div>
+        </div>
+
+        <div class="stat-card stat-card-green" data-card="reused">
+          <div class="stat-header">
+            <span class="stat-title">Retained in Active Use</span>
+            <span class="stat-icon">🔄</span>
+          </div>
+          <div class="stat-value" id="stat-retained-percent">75%</div>
+          <div class="stat-meta">Repair in Vehicle + 2nd-Life BESS</div>
+        </div>
+
+        <div class="stat-card" data-card="requests">
+          <div class="stat-header">
+            <span class="stat-title">Active Quotes & Requests</span>
+            <span class="stat-icon">💬</span>
+          </div>
+          <div class="stat-value" id="stat-open-requests">1</div>
+          <div class="stat-meta">Pending partner proposals</div>
+        </div>
+
+        <div class="stat-card stat-card-co2" data-card="co2">
+          <div class="stat-header">
+            <span class="stat-title">Estimated CO₂ Avoided</span>
+            <span class="stat-icon">🌿</span>
+          </div>
+          <div class="stat-value"><span id="stat-co2-avoided">0</span> <span class="unit">kg</span></div>
+          <div class="stat-meta">Grows when lifecycle reaches "Done"</div>
+        </div>
+      </div>
+
+      <!-- Lifecycle Stream Distribution Bar -->
+      <div class="stream-distribution-card">
+        <div class="stream-dist-header">
+          <div>
+            <h3>Lifecycle Triage Distribution</h3>
+            <p class="section-subtitle">Real-time partitioning based on transparent health degradation rules</p>
+          </div>
+          <div class="stream-legend">
+            <span class="legend-item"><span class="dot dot-repair"></span> Repair / Repack (<span id="count-repair">2</span>)</span>
+            <span class="legend-item"><span class="dot dot-storage"></span> 2nd-Life Storage (<span id="count-storage">1</span>)</span>
+            <span class="legend-item"><span class="dot dot-recycle"></span> Certified Recycler (<span id="count-recycle">1</span>)</span>
+          </div>
+        </div>
+        <div class="progress-stream-bar">
+          <div class="bar-segment bar-repair" id="bar-repair" style="width: 50%" title="Repair: 50%"></div>
+          <div class="bar-segment bar-storage" id="bar-storage" style="width: 25%" title="Storage: 25%"></div>
+          <div class="bar-segment bar-recycle" id="bar-recycle" style="width: 25%" title="Recycler: 25%"></div>
+        </div>
+      </div>
+
+      <!-- Split Layout: Inventory & Inspection Detail -->
+      <div class="dashboard-split">
+        
+        <!-- Left Column: Battery Catalog -->
+        <div class="catalog-column">
+          <div class="panel-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Registered EV Batteries</h2>
+                <span class="panel-subtitle">Select a pack to audit telemetry & lifecycle</span>
+              </div>
+              <div class="filter-controls">
+                <input type="text" id="battery-search" class="search-input" placeholder="Search ID, model, owner..." oninput="handleSearch(this.value)">
+              </div>
+            </div>
+
+            <!-- Triage Filters -->
+            <div class="pill-filters">
+              <button class="pill-btn active" data-filter="all" onclick="filterBatteries('all')">All (<span id="filter-all-count">4</span>)</button>
+              <button class="pill-btn" data-filter="repair" onclick="filterBatteries('repair')">🟢 Repair (≥70)</button>
+              <button class="pill-btn" data-filter="storage" onclick="filterBatteries('storage')">🟡 Storage (40-69)</button>
+              <button class="pill-btn" data-filter="recycle" onclick="filterBatteries('recycle')">🔴 Recycler (&lt;40 / Hazard)</button>
+            </div>
+
+            <!-- Battery Table / Cards List -->
+            <div class="battery-list-container" id="battery-list-container">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Detail & Health Diagnostics -->
+        <div class="detail-column">
+          <div class="panel-card detail-card" id="detail-panel">
+            <div class="detail-placeholder" id="detail-empty-state">
+              <span class="placeholder-icon">🔍</span>
+              <h3>No Battery Selected</h3>
+              <p>Click any battery from the list on the left to examine health score deductions, status timeline, and vendor matching.</p>
+            </div>
+
+            <div class="detail-body" id="detail-content" style="display: none;">
+              <!-- Header info -->
+              <div class="detail-top-row">
+                <div>
+                  <div class="detail-badge-group">
+                    <span class="id-badge" id="detail-id">EB-101</span>
+                    <span class="status-badge" id="detail-status">Registered</span>
+                    <span class="triage-badge" id="detail-triage">Repair / Repack</span>
+                  </div>
+                  <h2 class="detail-model" id="detail-model">Tata Nexon EV Max (40.5 kWh)</h2>
+                  <div class="detail-owner-meta" id="detail-owner">Owner: Rohan Sharma | Pune, MH</div>
+                </div>
+                
+                <div class="detail-actions">
+                  <button class="btn btn-outline btn-sm" onclick="advanceSelectedBatteryStatus()" id="advance-status-btn">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Simulate Next Status
+                  </button>
+                </div>
+              </div>
+
+              <!-- Health Score Gauge & Diagnostics Breakdown -->
+              <div class="score-audit-grid">
+                <!-- Circular Gauge -->
+                <div class="gauge-box">
+                  <div class="gauge-wrapper">
+                    <svg class="circular-chart" viewBox="0 0 36 36">
+                      <path class="circle-bg"
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                      <path class="circle-fill" id="gauge-circle-path"
+                        stroke-dasharray="82, 100"
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
+                      />
+                    </svg>
+                    <div class="gauge-center-text">
+                      <span class="gauge-number" id="gauge-score-value">82</span>
+                      <span class="gauge-label">Health Score</span>
+                    </div>
+                  </div>
+                  <div class="gauge-verdict" id="gauge-verdict-text">High Retained SOH</div>
+                </div>
+
+                <!-- Transparent Deduction Reasons -->
+                <div class="deductions-box">
+                  <div class="deductions-header">
+                    <h4>Transparent Score Deductions</h4>
+                    <span class="start-base">Base: 100 pts</span>
+                  </div>
+                  <div class="deductions-list" id="deductions-list">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recommendation Callout -->
+              <div class="recommendation-callout" id="recommendation-callout">
+                <div class="rec-icon" id="rec-icon">🛠️</div>
+                <div class="rec-content">
+                  <h4 id="rec-title">Triage Decision: Repair & Return to Vehicle</h4>
+                  <p id="rec-desc">This pack retains high voltage stability and low thermal degradation. Cell re-balancing or minor module repack will restore it to full vehicular service.</p>
+                </div>
+                <button class="btn btn-primary btn-sm" id="rec-action-btn" onclick="scrollToVendors()">
+                  Match Vendors
+                </button>
+              </div>
+
+              <!-- Lifecycle Progression Timeline -->
+              <div class="timeline-box">
+                <div class="timeline-header">
+                  <h4>Journey Status Timeline</h4>
+                  <span class="timeline-hint">Auditable chain of custody</span>
+                </div>
+                <div class="steps-progress-container" id="lifecycle-stepper">
+                  <div class="step-node active" id="step-registered">
+                    <div class="node-circle">1</div>
+                    <div class="node-label">Registered</div>
+                    <div class="node-time" id="step-time-registered">Today</div>
+                  </div>
+                  <div class="step-connector" id="conn-1-2"></div>
+                  <div class="step-node" id="step-collected">
+                    <div class="node-circle">2</div>
+                    <div class="node-label">Collected</div>
+                    <div class="node-time" id="step-time-collected">Pending</div>
+                  </div>
+                  <div class="step-connector" id="conn-2-3"></div>
+                  <div class="step-node" id="step-tested">
+                    <div class="node-circle">3</div>
+                    <div class="node-label">Tested & Audited</div>
+                    <div class="node-time" id="step-time-tested">Pending</div>
+                  </div>
+                  <div class="step-connector" id="conn-3-4"></div>
+                  <div class="step-node" id="step-done">
+                    <div class="node-circle">4</div>
+                    <div class="node-label">Done / Diverted</div>
+                    <div class="node-time" id="step-time-done">Pending</div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Active Quote Inquiries & Negotiations for Owner -->
+      <div class="panel-card mt-6" id="owner-quotes-section">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">My Quote Requests & Vendor Offers</h2>
+            <span class="panel-subtitle">Review proposals sent by verified network vendors</span>
+          </div>
+        </div>
+        <div class="quotes-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Request ID</th>
+                <th>Battery</th>
+                <th>Target Vendor</th>
+                <th>Service Path</th>
+                <th>Quote Amount</th>
+                <th>Vendor Remarks</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="owner-quotes-tbody">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Vendor Network & Interactive Map Section -->
+      <div class="panel-card mt-6" id="vendor-map-section">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">Certified Vendor & Partner Directory</h2>
+            <span class="panel-subtitle">Filter nearest repair shops, 2nd-life buyers, and certified recyclers</span>
+          </div>
+          <div class="vendor-filter-group">
+            <button class="pill-btn active" data-vfilter="all" onclick="filterVendors('all')">All Partners (<span id="vfilter-all-count">6</span>)</button>
+            <button class="pill-btn" data-vfilter="repair" onclick="filterVendors('repair')">🔧 Repair / Repack</button>
+            <button class="pill-btn" data-vfilter="storage" onclick="filterVendors('storage')">⚡ Storage Buyers</button>
+            <button class="pill-btn" data-vfilter="recycle" onclick="filterVendors('recycle')">♻️ Certified Recyclers</button>
+          </div>
+        </div>
+
+        <div class="vendor-layout-grid">
+          <!-- Left: Map Widget -->
+          <div class="map-container-box">
+            <div id="vendor-map" class="vendor-map-canvas"></div>
+            <div class="map-overlay-tip">
+              <span>📍 Showing partners within 25 km of your location</span>
+            </div>
+          </div>
+
+          <!-- Right: Vendor Cards Directory -->
+          <div class="vendor-cards-list" id="vendor-cards-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- VENDOR PORTAL VIEW -->
+    <section id="vendor-view" class="view-panel">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div>
+            <div class="view-tag-badge">🔧 Workshop & Buyer Portal</div>
+            <h2 class="panel-title">Incoming Battery Assessment & Quote Requests</h2>
+            <span class="panel-subtitle">Evaluate owner health scores and submit binding turnaround quotes</span>
+          </div>
+          <div class="vendor-status-pill">
+            <span class="status-online-dot"></span> Active Partner: AutoVolt Solutions (Repair Certified)
+          </div>
+        </div>
+
+        <div class="vendor-inbox-container" id="vendor-inbox-container">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- CERTIFIED RECYCLER VIEW -->
+    <section id="recycler-view" class="view-panel">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div>
+            <div class="view-tag-badge danger">♻️ Hazardous & E-Waste Hazmat Manifest</div>
+            <h2 class="panel-title">Certified Battery Recycling & Ingestion Terminal</h2>
+            <span class="panel-subtitle">High-risk, depleted, and physically compromised packs routed for raw material recovery</span>
+          </div>
+          <div class="recycler-facility-pill">
+            GreenCycle Certified Facility #MH-401 (EPR Authorized)
+          </div>
+        </div>
+
+        <div class="recycler-alerts-band" id="recycler-hazard-alert-box">
+          <div class="hazard-icon">⚠️</div>
+          <div>
+            <h4>Immediate Hazmat Protocol Enforced</h4>
+            <p>1 pack flagged with thermal anomaly (&gt;45°C) and physical casing swelling. Informal channel diversion strictly blocked.</p>
+          </div>
+        </div>
+
+        <div class="recycler-grid" id="recycler-manifest-grid">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- REGISTER BATTERY MODAL (WITH LIVE PREVIEW) -->
+  <div class="modal-backdrop" id="register-modal" role="dialog" aria-modal="true" aria-labelledby="register-modal-title">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="register-modal-title">Register EV Battery Pack</h2>
+          <p class="modal-subtitle">Live health assessment recalculates instantly as telemetry parameters change</p>
+        </div>
+        <button class="modal-close-btn" onclick="closeRegisterModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="register-split-grid">
+          <!-- Left: Input Form Controls -->
+          <form id="register-form" onsubmit="handleRegisterSubmit(event)">
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="reg-id">Battery ID</label>
+                <input type="text" id="reg-id" required value="EB-105" class="form-control">
+              </div>
+              <div class="form-group">
+                <label for="reg-model">Vehicle / Battery Model</label>
+                <input type="text" id="reg-model" required value="MG ZS EV (50.3 kWh)" class="form-control">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-owner">Owner Name & City</label>
+              <input type="text" id="reg-owner" required value="Vikram Malhotra | Mumbai" class="form-control">
+            </div>
+
+            <!-- Age Slider -->
+            <div class="slider-group">
+              <div class="slider-header">
+                <label for="reg-age">Battery Age (Years): <strong id="val-age">3</strong> yrs</label>
+                <span class="rule-hint">-4 pts/yr (max 32)</span>
+              </div>
+              <input type="range" id="reg-age" min="0" max="10" step="0.5" value="3" class="range-slider" oninput="updateLiveRegistrationPreview()">
+            </div>
+
+            <!-- Charge Cycles Slider -->
+            <div class="slider-group">
+              <div class="slider-header">
+                <label for="reg-cycles">Full Charge Cycles: <strong id="val-cycles">480</strong> cycles</label>
+                <span class="rule-hint">-1 pt/40 cycles (max 35)</span>
+              </div>
+              <input type="range" id="reg-cycles" min="0" max="2000" step="10" value="480" class="range-slider" oninput="updateLiveRegistrationPreview()">
+            </div>
+
+            <!-- Voltage Group -->
+            <div class="form-row-2">
+              <div class="form-group">
+                <label for="reg-v-rated">Rated Voltage (V)</label>
+                <input type="number" id="reg-v-rated" value="400" min="24" max="800" class="form-control" oninput="updateLiveRegistrationPreview()">
+              </div>
+              <div class="form-group">
+                <label for="reg-v-actual">Current Measured Voltage (V)</label>
+                <input type="number" id="reg-v-actual" value="382" min="10" max="800" class="form-control" oninput="updateLiveRegistrationPreview()">
+              </div>
+            </div>
+            <div class="voltage-delta-note">
+              Voltage Drop: <span id="val-v-drop">4.5% below rated</span> <span class="rule-hint">(-1.5 pts / % below rated, max 30)</span>
+            </div>
+
+            <!-- Peak Operating Temperature Slider -->
+            <div class="slider-group">
+              <div class="slider-header">
+                <label for="reg-temp">Peak Recorded Temperature (°C): <strong id="val-temp">38</strong> °C</label>
+                <span class="rule-hint">-1.5 pts/°C above 45°C (max 15)</span>
+              </div>
+              <input type="range" id="reg-temp" min="20" max="70" step="1" value="38" class="range-slider" oninput="updateLiveRegistrationPreview()">
+            </div>
+
+            <!-- Physical Damage Toggle -->
+            <div class="checkbox-container">
+              <label class="custom-checkbox">
+                <input type="checkbox" id="reg-damage" onchange="updateLiveRegistrationPreview()">
+                <span class="checkmark"></span>
+                <span class="checkbox-label">
+                  <strong>Swelling, Electrolyte Leakage, or Structural Damage?</strong>
+                  <span class="checkbox-subtext">Immediate -40 points penalty + mandatory Certified Recycler routing</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="modal-footer-actions">
+              <button type="button" class="btn btn-secondary" onclick="closeRegisterModal()">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save & Register Battery</button>
+            </div>
+          </form>
+
+          <!-- Right: Live Instant Assessment Preview -->
+          <div class="live-preview-box">
+            <div class="preview-badge">LIVE HEALTH AUDIT PREVIEW</div>
+            
+            <div class="preview-score-display">
+              <div class="preview-score-number" id="preview-score">81</div>
+              <div class="preview-score-denom">/ 100</div>
+            </div>
+            <div class="preview-triage-pill" id="preview-triage-pill">Repair or Repack</div>
+
+            <div class="preview-deductions-box">
+              <h5>Real-Time Deduction Tally:</h5>
+              <ul class="preview-deductions-list" id="preview-deductions-list">
+                <!-- Populated live -->
+              </ul>
+            </div>
+
+            <div class="preview-co2-callout" id="preview-co2-info">
+              🌱 Diverting this pack saves ~<strong>420 kg CO₂</strong>!
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REQUEST QUOTE MODAL -->
+  <div class="modal-backdrop" id="quote-modal" role="dialog" aria-modal="true" aria-labelledby="quote-modal-title">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="quote-modal-title">Send Quote Request</h2>
+          <p class="modal-subtitle">Share battery health telemetry with the vendor to get pricing</p>
+        </div>
+        <button class="modal-close-btn" onclick="closeQuoteModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="quote-request-form" onsubmit="handleQuoteSubmit(event)">
+          <div class="selected-target-summary" id="quote-vendor-summary">
+            <!-- Vendor info injected -->
+          </div>
+
+          <div class="form-group mt-4">
+            <label for="quote-battery-select">Select Battery to Route:</label>
+            <select id="quote-battery-select" class="form-control" required onchange="updateQuoteModalBatteryDetails()">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <div class="attached-health-pill" id="quote-attached-health">
+            <!-- Attached health details -->
+          </div>
+
+          <div class="form-group mt-4">
+            <label for="quote-notes">Additional Owner Notes / Logistics Preference:</label>
+            <textarea id="quote-notes" class="form-control" rows="3" placeholder="e.g. Battery available for pickup next Tuesday; vehicle decommissioned."></textarea>
+          </div>
+
+          <div class="modal-footer-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeQuoteModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Transmit Request</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALERTS & NOTIFICATIONS DRAWER -->
+  <div class="drawer-backdrop" id="alerts-drawer-backdrop" onclick="toggleAlertsDrawer(false)"></div>
+  <aside class="alerts-drawer" id="alerts-drawer" aria-label="Notifications Drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <span>🔔 Alerts & Compliance Log</span>
+      </div>
+      <button class="drawer-close-btn" onclick="toggleAlertsDrawer(false)">✕</button>
+    </div>
+    <div class="drawer-body" id="alerts-list">
+      <!-- Populated dynamically -->
+    </div>
+  </aside>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-content">
+      <div class="footer-left">
+        <strong>EcoDispose</strong> — Smart EV Battery Disposal & Recycling Ecosystem | <strong>Team CodeXtra</strong>
+      </div>
+      <div class="footer-right">
+        <span>Zero-landfill Circular Economy</span> • <span>ISO 14040 Life Cycle Assessment aligned</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Main Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
